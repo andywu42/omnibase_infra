@@ -2,10 +2,9 @@
 # Copyright (c) 2025 OmniNode Team
 """Handler Bootstrap Source for Hardcoded Handler Registration.
 
-This module provides HandlerBootstrapSource, which centralizes all hardcoded handler
-wiring that was previously scattered in util_wiring.py. This source implements
-ProtocolContractSource and provides handler descriptors for the core infrastructure
-handlers (Consul, Database, HTTP, Vault, MCP).
+HandlerBootstrapSource centralizes all hardcoded handler wiring that was previously
+scattered in util_wiring.py. It implements ProtocolContractSource and provides
+handler descriptors for the core infrastructure handlers (Database, HTTP, MCP).
 
 Part of OMN-1087: HandlerBootstrapSource for hardcoded handler registration.
 
@@ -21,7 +20,6 @@ Contract Loading:
     - Validation that contract files exist and are well-formed
 
     Contract file locations (relative to repo root):
-    - contracts/handlers/consul/handler_contract.yaml (basic contract)
     - contracts/handlers/db/handler_contract.yaml (basic contract)
     - contracts/handlers/http/handler_contract.yaml (basic contract)
     - contracts/handlers/vault/handler_contract.yaml (basic contract)
@@ -35,7 +33,6 @@ Contract Loading:
     valid configuration.
 
 Registered Handlers:
-    - consul: HandlerConsul for HashiCorp Consul service discovery
     - db: HandlerDb for PostgreSQL database operations
     - http: HandlerHttpRest for HTTP/REST protocol operations
     - vault: HandlerVault for HashiCorp Vault secret management
@@ -212,7 +209,6 @@ logger = logging.getLogger(__name__)
 SOURCE_TYPE_BOOTSTRAP = "BOOTSTRAP"
 
 # Handler type constants (matching handler_registry.py)
-_HANDLER_TYPE_CONSUL = "consul"
 _HANDLER_TYPE_DATABASE = "db"
 _HANDLER_TYPE_HTTP = "http"
 _HANDLER_TYPE_MCP = "mcp"
@@ -242,16 +238,6 @@ _HANDLER_TYPE_MCP = "mcp"
 # The BootstrapEffectDefinition TypedDict ensures handler_kind is typed as LiteralHandlerKind,
 # providing compile-time type safety for the hardcoded values.
 _BOOTSTRAP_HANDLER_DEFINITIONS: list[BootstrapEffectDefinition] = [
-    {
-        "handler_id": handler_identity(_HANDLER_TYPE_CONSUL),
-        "name": "Consul Handler",
-        "description": "HashiCorp Consul service discovery handler",
-        "handler_kind": "effect",
-        "handler_class": "omnibase_infra.handlers.handler_consul.HandlerConsul",
-        "input_model": "omnibase_infra.models.types.JsonDict",
-        "output_model": "omnibase_core.models.dispatch.ModelHandlerOutput",
-        "contract_path": "contracts/handlers/consul/handler_contract.yaml",
-    },
     {
         "handler_id": handler_identity(_HANDLER_TYPE_DATABASE),
         "name": "Database Handler",
@@ -294,10 +280,10 @@ class HandlerBootstrapSource(
 ):  # naming-ok: Handler prefix required by ProtocolHandlerSource convention
     """Handler source that provides hardcoded bootstrap handler descriptors.
 
-    This class implements ProtocolContractSource by returning predefined handler
-    descriptors for core infrastructure handlers. Unlike HandlerContractSource
-    which discovers handlers from filesystem contracts, this source provides
-    handlers that are essential for the ONEX runtime bootstrap process.
+    Implements ProtocolContractSource by returning predefined handler descriptors
+    for core infrastructure handlers. Unlike HandlerContractSource which discovers
+    handlers from filesystem contracts, this source provides handlers essential
+    for the ONEX runtime bootstrap process.
 
     Protocol Compliance:
         This class explicitly inherits from ProtocolContractSource and implements
@@ -312,10 +298,9 @@ class HandlerBootstrapSource(
         >>> source = HandlerBootstrapSource()
         >>> result = await source.discover_handlers()
         >>> print(f"Found {len(result.descriptors)} bootstrap handlers")
-        Found 5 bootstrap handlers
+        Found 4 bootstrap handlers
         >>> for desc in result.descriptors:
         ...     print(f"  - {desc.handler_id}: {desc.description}")
-        - proto.consul: HashiCorp Consul service discovery handler
         - proto.db: PostgreSQL database handler
         - proto.http: HTTP REST protocol handler
         - proto.mcp: Model Context Protocol handler for AI agent integration

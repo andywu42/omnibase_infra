@@ -13,7 +13,7 @@ Envelope-Based Routing:
     design pattern and how orchestrators translate intents to handler envelopes.
 
 Single-Statement SQL Limitation
-===============================
+--------------------------------
 
 This handler uses asyncpg's ``execute()`` and ``fetch()`` methods, which only
 support **single SQL statements per call**. Multi-statement SQL (statements

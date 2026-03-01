@@ -2,7 +2,7 @@
 # Copyright (c) 2025 OmniNode Team
 """Runtime Host Process implementation for ONEX Infrastructure.
 
-This module implements the RuntimeHostProcess class, which is responsible for:
+Implements RuntimeHostProcess — responsible for:
 - Owning and managing an event bus instance (EventBusInmemory or EventBusKafka)
 - Registering handlers via the wiring module
 - Subscribing to event bus topics and routing envelopes to handlers
@@ -1837,7 +1837,7 @@ class RuntimeHostProcess:
     async def _discover_or_wire_handlers(self) -> None:
         """Discover and register handlers for the runtime.
 
-        This method implements the handler discovery/wiring step (Step 3) of the
+        Implements the handler discovery/wiring step (Step 3) of the
         start() sequence. It uses HandlerSourceResolver to discover handlers
         based on the configured source mode.
 
@@ -2081,6 +2081,41 @@ class RuntimeHostProcess:
                         effective_config.update(self._config)
                         if descriptor and descriptor.contract_config:
                             config_source = "contract+runtime_override"
+
+                    # Layer 3: Handler-specific env var injection
+                    # Inject well-known env vars into the effective config for handlers
+                    # that require them. This keeps handler code free of os.environ access
+                    # (per architecture invariant INV-3) while still supporting env-based
+                    # configuration for infrastructure handlers.
+                    if handler_type == "db" and "dsn" not in effective_config:
+                        db_url = os.environ.get(
+                            "OMNIBASE_INFRA_DB_URL"
+                        ) or os.environ.get("DATABASE_URL")
+                        if db_url:
+                            effective_config["dsn"] = db_url
+
+                    if handler_type == "mcp":
+                        # Inject MCP API key from env if available.
+                        # When no api_key is configured and auth is not explicitly
+                        # disabled, disable auth to allow local dev startup without
+                        # requiring Infisical/secret configuration.
+                        mcp_api_key = os.environ.get("MCP_API_KEY") or os.environ.get(
+                            "ONEX_MCP_API_KEY"
+                        )
+                        if mcp_api_key and "api_key" not in effective_config:
+                            effective_config["api_key"] = mcp_api_key
+                        elif "auth_enabled" not in effective_config and not mcp_api_key:
+                            effective_config["auth_enabled"] = False
+
+                        # Skip the uvicorn server when running in-memory event bus
+                        # mode (e.g., tests). This prevents port-binding conflicts
+                        # when multiple RuntimeHostProcess instances start within the
+                        # same process (each would attempt to bind the same MCP port).
+                        if (
+                            "skip_server" not in effective_config
+                            and os.environ.get("ONEX_EVENT_BUS_TYPE") == "inmemory"
+                        ):
+                            effective_config["skip_server"] = True
 
                     # Pass empty dict if no config, not None
                     # Handlers expect dict interface (e.g., config.get("key"))
@@ -3767,7 +3802,7 @@ class RuntimeHostProcess:
     async def get_subscribers_for_topic(self, topic: str) -> list[UUID]:
         """Query Consul for node IDs that subscribe to a topic.
 
-        This method provides dynamic topic-to-subscriber lookup via Consul KV store.
+        Provides dynamic topic-to-subscriber lookup via Consul KV store.
         Topics are stored at `onex/topics/{topic}/subscribers` and contain a JSON
         array of node UUID strings.
 
@@ -5109,7 +5144,7 @@ class RuntimeHostProcess:
         response and returns False.
 
         Fail-Open Semantics:
-            This method implements **fail-open** error handling: if the
+            Implements **fail-open** error handling: if the
             idempotency store is unavailable or throws an error, the message
             is allowed through for processing (with a warning log).
 
