@@ -470,7 +470,9 @@ INFRA_NODES_PATH = "src/omnibase_infra/nodes/"
 #                     ModelBifrostRequest._coerce_messages(): list[JsonDict] | tuple[JsonDict, ...]
 # - 130 (2026-02-27): OMN-2923 catalog responder dispatcher
 #                     DispatcherCatalogRequest.handle(): ModelEventEnvelope[object] | dict[str, object]
-INFRA_MAX_UNIONS = 130
+# - 131 (2026-03-01): OMN-3202 graph handler signature fix
+#                     HandlerGraph.initialize(): dict[str, object] | str
+INFRA_MAX_UNIONS = 131
 
 # Maximum allowed architecture violations in infrastructure code.
 # Set to 0 (strict enforcement) to ensure one-model-per-file principle is always followed.
@@ -1231,8 +1233,7 @@ def _count_non_optional_unions(
     """
     Count unions in a directory, excluding simple optional and isinstance patterns.
 
-    This function provides accurate union counting for threshold checks by
-    excluding:
+    Excludes:
     - Idiomatic `X | None` patterns (simple optionals) that are valid ONEX style
     - isinstance(x, A | B) patterns that are runtime type checks, not annotations
 
