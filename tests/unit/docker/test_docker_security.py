@@ -595,26 +595,24 @@ class TestDockerNetworkSecurity:
             "instead of hardcoded IPs for portability."
         )
 
-        # Services should use internal Docker service names, not external hosts
-        # These patterns indicate proper internal service communication
-        internal_service_patterns = [
-            "postgres:5432",  # Internal PostgreSQL
-            "redpanda:9092",  # Internal Redpanda/Kafka
-            "valkey:6379",  # Internal Valkey/Redis
-            "consul:8500",  # Internal Consul (optional profile)
+        # Services should use internal Docker service names, not external hosts.
+        # Note: Redpanda (Kafka) was removed from local compose (OMN-3299) — the
+        # platform uses remote Redpanda exclusively via KAFKA_BOOTSTRAP_SERVERS.
+        # DSN/URL construction was also moved to ~/.omnibase/.env (PR #513/OMN-3266),
+        # so host:port patterns no longer appear as inline fallbacks in compose.
+        # Instead, verify that internal service names are defined as top-level keys.
+        internal_service_names = [
+            "postgres:",  # Internal PostgreSQL service definition
+            "valkey:",  # Internal Valkey/Redis service definition
+            "consul:",  # Internal Consul service definition (optional profile)
         ]
 
-        # Verify at least some internal service references exist.
-        # Threshold is 1: the PR that removed nested variable expansion
-        # (OMN-3266) moved all DSN/URL construction to ~/.omnibase/.env,
-        # so postgres:5432 no longer appears as an inline fallback in the
-        # compose file.  redpanda:9092 remains (Kafka advertise-kafka-addr),
-        # which is sufficient to confirm internal service naming is in use.
+        # Verify at least some internal service names are defined in this compose.
         internal_refs_found = sum(
-            1 for pattern in internal_service_patterns if pattern in content
+            1 for name in internal_service_names if name in content
         )
         assert internal_refs_found >= 1, (
-            f"Expected internal service name references (e.g., redpanda:9092), "
+            f"Expected internal service definitions (e.g., 'postgres:', 'valkey:'), "
             f"found {internal_refs_found}"
         )
 
