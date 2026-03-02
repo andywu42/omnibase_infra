@@ -2,9 +2,9 @@
 # Copyright (c) 2025 OmniNode Team
 """Async Kafka Consumer for Agent Actions Observability.
 
-This module provides an async Kafka consumer for agent observability events.
-Events are consumed from multiple topics, validated using Pydantic models,
-and persisted to PostgreSQL via the WriterAgentActionsPostgres.
+Consumes agent observability events from multiple Kafka topics, validates each
+event against its registered Pydantic model, and persists batches to PostgreSQL
+via WriterAgentActionsPostgres.
 
 Design Decisions:
     - Per-partition offset tracking: Commit only successfully persisted partitions
@@ -84,6 +84,9 @@ from omnibase_infra.services.observability.agent_actions.models import (
     ModelPerformanceMetric,
     ModelRoutingDecision,
     ModelTransformationEvent,
+)
+from omnibase_infra.services.observability.agent_actions.models.model_routing_decision_ingest import (
+    ModelRoutingDecisionIngest,
 )
 from omnibase_infra.services.observability.agent_actions.writer_postgres import (
     WriterAgentActionsPostgres,
@@ -167,9 +170,13 @@ def mask_dsn_password(dsn: str) -> str:
 # OMN-2902: "agent-execution-logs" renamed to "onex.evt.omniclaude.agent-execution-logs.v1".
 # OMN-2846: "onex.evt.omniclaude.agent-status.v1" renamed from "onex.evt.agent.status.v1".
 # OMN-2986: All topic names must match config.py (canonical ONEX names).
+# OMN-3422: routing-decision.v1 uses permissive ingest model at Kafka boundary.
+#   ModelRoutingDecisionIngest maps producer field names (confidence, reasoning,
+#   session_id, emitted_at) to internal conventions. ModelRoutingDecision (strict)
+#   is preserved for all downstream use.
 TOPIC_TO_MODEL: dict[str, type[BaseModel]] = {
     "onex.evt.omniclaude.agent-actions.v1": ModelAgentAction,
-    "onex.evt.omniclaude.routing-decision.v1": ModelRoutingDecision,
+    "onex.evt.omniclaude.routing-decision.v1": ModelRoutingDecisionIngest,  # OMN-3422: was ModelRoutingDecision
     "onex.evt.omniclaude.agent-transformation.v1": ModelTransformationEvent,
     "onex.evt.omniclaude.performance-metrics.v1": ModelPerformanceMetric,
     "onex.evt.omniclaude.detection-failure.v1": ModelDetectionFailure,
