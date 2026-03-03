@@ -2,8 +2,8 @@
 # Copyright (c) 2025 OmniNode Team
 """Registration domain wiring for MessageDispatchEngine integration.
 
-This module provides domain-specific wiring functions for the Registration
-orchestrator, enabling dispatchers to be registered with MessageDispatchEngine.
+Domain-specific wiring functions for the Registration orchestrator, enabling
+dispatchers to be registered with MessageDispatchEngine.
 
 The wiring follows the domain-driven design principle where Registration-specific
 code (dispatchers, route IDs, handlers) lives in the Registration domain rather
@@ -196,6 +196,7 @@ async def wire_registration_dispatchers(
     container: ModelONEXContainer,
     engine: MessageDispatchEngine,
     correlation_id: UUID | None = None,
+    event_bus: ProtocolEventBus | None = None,
 ) -> dict[str, list[str] | str]:
     """Wire registration dispatchers into MessageDispatchEngine.
 
@@ -215,6 +216,9 @@ async def wire_registration_dispatchers(
         engine: MessageDispatchEngine instance to register dispatchers with.
         correlation_id: Optional correlation ID for error tracking. If not provided,
             one will be auto-generated when errors are raised.
+        event_bus: Optional event bus for direct-publishing the auto-ACK command
+            (Path B, OMN-3444). Passed to DispatcherNodeIntrospected. When None,
+            auto-ACK is silently skipped even if ONEX_REGISTRATION_AUTO_ACK=true.
 
     Returns:
         Summary dict with diagnostic information:
@@ -354,7 +358,9 @@ async def wire_registration_dispatchers(
             )
 
         # 2. Create dispatcher adapters
-        dispatcher_introspected = DispatcherNodeIntrospected(handler_introspected)
+        dispatcher_introspected = DispatcherNodeIntrospected(
+            handler_introspected, event_bus=event_bus
+        )
         dispatcher_runtime_tick = DispatcherRuntimeTick(handler_runtime_tick)
         dispatcher_acked = DispatcherNodeRegistrationAcked(handler_acked)
 

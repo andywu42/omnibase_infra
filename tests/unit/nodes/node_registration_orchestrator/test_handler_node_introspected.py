@@ -867,3 +867,12 @@ class TestCapabilitiesJsonbCompatibility:
         assert caps.get("postgres") is False
         assert caps.get("read") is False
         assert caps.get("write") is False
+
+
+class TestHandlerNodeIntrospectedAutoAck:
+    """Stub class: auto-ACK tests moved to test_dispatcher_node_introspected.py (OMN-3444).
+
+    The handler no longer holds event_bus — auto-ACK is now the dispatcher's
+    responsibility (architecture invariant: handlers cannot have event_bus access).
+    See DispatcherNodeIntrospected and test_dispatcher_node_introspected.py.
+    """

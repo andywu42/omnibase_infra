@@ -4,8 +4,8 @@
 # TRY400 disabled: logger.error is intentional to avoid leaking sensitive data in stack traces
 """Dispatcher adapter for HandlerNodeIntrospected.
 
-This module provides a ProtocolMessageDispatcher adapter that wraps
-HandlerNodeIntrospected for integration with MessageDispatchEngine.
+ProtocolMessageDispatcher adapter that wraps HandlerNodeIntrospected for
+integration with MessageDispatchEngine.
 
 The adapter:
 - Deserializes ModelEventEnvelope payload to ModelNodeIntrospectionEvent
@@ -57,6 +57,7 @@ Related:
 from __future__ import annotations
 
 import logging
+import os
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 from uuid import uuid4
@@ -65,6 +66,7 @@ from pydantic import ValidationError
 
 from omnibase_core.enums import EnumNodeKind
 from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
+from omnibase_core.protocols.event_bus.protocol_event_bus import ProtocolEventBus
 from omnibase_infra.enums import (
     EnumDispatchStatus,
     EnumInfraTransportType,
@@ -73,12 +75,19 @@ from omnibase_infra.enums import (
 from omnibase_infra.errors import InfraUnavailableError
 from omnibase_infra.mixins import MixinAsyncCircuitBreaker
 from omnibase_infra.models.dispatch.model_dispatch_result import ModelDispatchResult
+from omnibase_infra.models.registration.commands.model_node_registration_acked import (
+    ModelNodeRegistrationAcked,
+)
+from omnibase_infra.models.registration.events.model_node_registration_accepted import (
+    ModelNodeRegistrationAccepted,
+)
 from omnibase_infra.models.registration.model_node_introspection_event import (
     ModelNodeIntrospectionEvent,
 )
 from omnibase_infra.nodes.node_registration_orchestrator.dispatchers._util_envelope_extract import (
     extract_envelope_fields,
 )
+from omnibase_infra.topics import SUFFIX_NODE_REGISTRATION_ACKED
 from omnibase_infra.utils import sanitize_error_message
 
 if TYPE_CHECKING:
@@ -94,6 +103,18 @@ logger = logging.getLogger(__name__)
 # Note: Internal identifier for logging/metrics, NOT the actual Kafka topic.
 # Actual topic is configured via ModelDispatchRoute.topic_pattern.
 TOPIC_ID_NODE_INTROSPECTION = "node.introspection"
+
+_ENV_AUTO_ACK = "ONEX_REGISTRATION_AUTO_ACK"
+_ACK_TOPIC: str = SUFFIX_NODE_REGISTRATION_ACKED
+
+
+def _auto_ack_enabled() -> bool:
+    """Return True when ONEX_REGISTRATION_AUTO_ACK=true in the environment.
+
+    Intended for local/dev use only — in production external nodes send their
+    own ack command, bypassing the distributed handshake.  See OMN-3444.
+    """
+    return os.environ.get(_ENV_AUTO_ACK, "false").lower() == "true"
 
 
 class DispatcherNodeIntrospected(MixinAsyncCircuitBreaker):
@@ -129,11 +150,18 @@ class DispatcherNodeIntrospected(MixinAsyncCircuitBreaker):
         >>> result = await dispatcher.handle(envelope)
     """
 
-    def __init__(self, handler: HandlerNodeIntrospected) -> None:
+    def __init__(
+        self,
+        handler: HandlerNodeIntrospected,
+        event_bus: ProtocolEventBus | None = None,
+    ) -> None:
         """Initialize dispatcher with wrapped handler and circuit breaker.
 
         Args:
             handler: HandlerNodeIntrospected instance to delegate to.
+            event_bus: Optional event bus for direct-publishing the auto-ACK
+                command (Path B, OMN-3444). When None, auto-ACK is silently
+                skipped even if ONEX_REGISTRATION_AUTO_ACK=true.
 
         Circuit Breaker:
             Initialized with KAFKA transport settings per dispatcher_resilience.md:
@@ -141,6 +169,7 @@ class DispatcherNodeIntrospected(MixinAsyncCircuitBreaker):
             - reset_timeout=20.0: 20 seconds before testing recovery
         """
         self._handler = handler
+        self._event_bus = event_bus
 
         # Initialize circuit breaker using mixin pattern
         # Configuration follows docs/patterns/dispatcher_resilience.md guidelines
@@ -283,6 +312,45 @@ class DispatcherNodeIntrospected(MixinAsyncCircuitBreaker):
             handler_output = await self._handler.handle(handler_envelope)
             output_events = list(handler_output.events)
             output_intents = handler_output.intents
+
+            # Auto-ACK (Path B, OMN-3444): direct-publish ack when the reducer transitions
+            # to AWAITING_ACK. Gate: ModelNodeRegistrationAccepted in output events.
+            # Published directly to _ACK_TOPIC (NOT in output_events — framework routes
+            # those to the wrong topic via single fixed output_topic).
+            if (
+                _auto_ack_enabled()
+                and self._event_bus is not None
+                and any(
+                    isinstance(e, ModelNodeRegistrationAccepted) for e in output_events
+                )
+            ):
+                auto_ack_payload = ModelNodeRegistrationAcked(
+                    node_id=payload.node_id,
+                    correlation_id=correlation_id,
+                    timestamp=now,
+                )
+                ack_envelope: ModelEventEnvelope[object] = ModelEventEnvelope(
+                    envelope_id=uuid4(),
+                    payload=auto_ack_payload,
+                    envelope_timestamp=now,
+                    correlation_id=correlation_id,
+                    source=self.dispatcher_id,
+                )
+                # ModelEventEnvelope is structurally compatible with ProtocolEventEnvelope
+                # but lacks the async get_payload() method; mixin_node_introspection uses
+                # the same pattern (mixin_node_introspection.py:2276).
+                await self._event_bus.publish_envelope(
+                    ack_envelope,  # type: ignore[arg-type]
+                    topic=_ACK_TOPIC,
+                )
+                logger.debug(
+                    "Auto-ACK published for node %s (ONEX_REGISTRATION_AUTO_ACK=true)",
+                    payload.node_id,
+                    extra={
+                        "node_id": str(payload.node_id),
+                        "correlation_id": str(correlation_id),
+                    },
+                )
 
             completed_at = datetime.now(UTC)
             duration_ms = (completed_at - started_at).total_seconds() * 1000
