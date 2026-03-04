@@ -471,15 +471,6 @@ class TestInfraConnectionError:
         error = InfraConnectionError("Kafka connection failed", context=context)
         assert error.model.error_code == EnumCoreErrorCode.SERVICE_UNAVAILABLE
 
-    def test_error_code_mapping_consul_transport(self) -> None:
-        """Test CONSUL transport uses SERVICE_UNAVAILABLE."""
-        context = ModelInfraErrorContext(
-            transport_type=EnumInfraTransportType.CONSUL,
-            target_name="consul-server",
-        )
-        error = InfraConnectionError("Consul connection failed", context=context)
-        assert error.model.error_code == EnumCoreErrorCode.SERVICE_UNAVAILABLE
-
     def test_error_code_mapping_valkey_transport(self) -> None:
         """Test VALKEY transport uses SERVICE_UNAVAILABLE."""
         context = ModelInfraErrorContext(
@@ -543,7 +534,6 @@ class TestInfraConnectionErrorTransportMapping:
         """Test _resolve_connection_error_code for service transports."""
         service_transports = [
             EnumInfraTransportType.KAFKA,
-            EnumInfraTransportType.CONSUL,
             EnumInfraTransportType.VALKEY,
         ]
         for transport in service_transports:
@@ -582,7 +572,6 @@ class TestInfraConnectionErrorTransportMapping:
             (EnumInfraTransportType.HTTP, EnumCoreErrorCode.NETWORK_ERROR),
             (EnumInfraTransportType.GRPC, EnumCoreErrorCode.NETWORK_ERROR),
             (EnumInfraTransportType.KAFKA, EnumCoreErrorCode.SERVICE_UNAVAILABLE),
-            (EnumInfraTransportType.CONSUL, EnumCoreErrorCode.SERVICE_UNAVAILABLE),
             (EnumInfraTransportType.VALKEY, EnumCoreErrorCode.SERVICE_UNAVAILABLE),
         ]
         for transport, expected_code in test_cases:
@@ -663,7 +652,7 @@ class TestInfraAuthenticationError:
     def test_with_context_model(self) -> None:
         """Test error with context model and auth details."""
         context = ModelInfraErrorContext(
-            target_name="consul",
+            target_name="infisical",
             operation="authenticate",
         )
         error = InfraAuthenticationError(
@@ -671,7 +660,7 @@ class TestInfraAuthenticationError:
             context=context,
             username="admin",
         )
-        assert error.model.context["target_name"] == "consul"
+        assert error.model.context["target_name"] == "infisical"
         assert error.model.context["operation"] == "authenticate"
         assert error.model.context["username"] == "admin"
 
@@ -727,19 +716,19 @@ class TestInfraUnavailableError:
 
     def test_error_chaining(self) -> None:
         """Test error chaining from exception."""
-        context = ModelInfraErrorContext(target_name="consul")
+        context = ModelInfraErrorContext(target_name="valkey")
         resource_error = ConnectionRefusedError("Not responding")
         try:
             raise InfraUnavailableError(
-                "Consul unavailable",
+                "Valkey unavailable",
                 context=context,
-                host="consul.local",
-                port=8500,
+                host="valkey.local",
+                port=6379,
             ) from resource_error
         except InfraUnavailableError as e:
             assert e.__cause__ == resource_error
-            assert e.model.context["target_name"] == "consul"
-            assert e.model.context["port"] == 8500
+            assert e.model.context["target_name"] == "valkey"
+            assert e.model.context["port"] == 6379
 
 
 class TestInfraRateLimitedError:
@@ -929,9 +918,8 @@ class TestStructuredFieldsComprehensive:
             EnumInfraTransportType.INFISICAL,
             EnumInfraTransportType.DATABASE,
             EnumInfraTransportType.KAFKA,
-            EnumInfraTransportType.CONSUL,
-            EnumInfraTransportType.VALKEY,
             EnumInfraTransportType.GRPC,
+            EnumInfraTransportType.VALKEY,
         ]
         errors = [
             ProtocolConfigurationError(
@@ -962,19 +950,13 @@ class TestStructuredFieldsComprehensive:
             InfraAuthenticationError(
                 "test",
                 context=ModelInfraErrorContext(
-                    transport_type=EnumInfraTransportType.CONSUL
+                    transport_type=EnumInfraTransportType.GRPC
                 ),
             ),
             InfraUnavailableError(
                 "test",
                 context=ModelInfraErrorContext(
                     transport_type=EnumInfraTransportType.VALKEY
-                ),
-            ),
-            InfraRateLimitedError(
-                "test",
-                context=ModelInfraErrorContext(
-                    transport_type=EnumInfraTransportType.GRPC
                 ),
             ),
         ]
@@ -1031,7 +1013,7 @@ class TestStructuredFieldsComprehensive:
             "vault",
             "postgresql",
             "kafka",
-            "consul",
+            "grpc-service",
             "valkey",
             "openai-api",
         ]
@@ -1054,7 +1036,7 @@ class TestStructuredFieldsComprehensive:
                 ),
             ),
             InfraAuthenticationError(
-                "test", context=ModelInfraErrorContext(target_name="consul")
+                "test", context=ModelInfraErrorContext(target_name="grpc-service")
             ),
             InfraUnavailableError(
                 "test", context=ModelInfraErrorContext(target_name="valkey")
@@ -1350,7 +1332,7 @@ class TestContextSerialization:
 
         correlation_id = uuid4()
         original = ModelInfraErrorContext(
-            transport_type=EnumInfraTransportType.CONSUL,
+            transport_type=EnumInfraTransportType.GRPC,
             operation="register_service",
             target_name="my-service",
             correlation_id=correlation_id,
@@ -1441,7 +1423,6 @@ class TestContextSerialization:
             EnumInfraTransportType.HTTP,
             EnumInfraTransportType.DATABASE,
             EnumInfraTransportType.KAFKA,
-            EnumInfraTransportType.CONSUL,
             EnumInfraTransportType.VALKEY,
         ]
         for transport in transport_types:
