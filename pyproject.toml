@@ -63,8 +63,9 @@ dependencies = [
     "confluent-kafka>=2.12.0,<3.0.0", # For Kafka integration (C-based high-performance client)
     "infisicalsdk>=1.0.15,<2.0.0", # For Infisical secret management (OMN-2286)
     # Vector and graph database dependencies (for Qdrant and Memgraph handlers)
-    "qdrant-client>=1.12.0,<2.0.0", # Vector database client for semantic search
-    "neo4j>=5.15.0,<6.0.0", # Bolt/Cypher client for Memgraph graph database
+    "qdrant-client>=1.16.0,<2.0.0",  # Vector database client for semantic search
+    "grpcio>=1.62.0,<2.0.0",  # Explicit lower bound: fixes EnumTypeWrapper|None runtime error [OMN-3548]
+    "neo4j>=5.15.0,<6.0.0",  # Bolt/Cypher client for Memgraph graph database
     # CLI Dependencies
     "click>=8.1.0,<9.0.0",
     "rich>=13.7.0,<14.0.0",
