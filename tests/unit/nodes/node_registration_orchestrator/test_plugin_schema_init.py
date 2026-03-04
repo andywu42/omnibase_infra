@@ -143,6 +143,70 @@ class TestSchemaInitAdvisoryLock:
     """Advisory lock is acquired before schema SQL executes (R1)."""
 
     @pytest.mark.unit
+    async def test_advisory_lock_inside_transaction(self) -> None:
+        """Advisory lock must execute while conn.transaction() is active.
+
+        The entire deadlock fix (OMN-3567) relies on pg_advisory_xact_lock
+        being called *inside* ``async with conn.transaction()`` so that the
+        lock auto-releases on commit/rollback.  The other ordering tests
+        (``test_advisory_lock_called_before_schema_sql``, etc.) would still
+        pass if the advisory lock call were moved *outside* the transaction
+        block, because their mock ``_transaction()`` is a no-op passthrough.
+
+        This test uses a transaction-tracking context manager that flips a
+        flag while the ``async with conn.transaction()`` block is active.
+        The ``execute()`` side-effect captures the flag value at call time,
+        so the assertion proves the advisory lock runs while the transaction
+        is open.
+        """
+        transaction_active = False
+        advisory_called_inside: list[bool] = []
+        schema_called_inside: list[bool] = []
+
+        @asynccontextmanager
+        async def _tracking_transaction() -> AsyncIterator[None]:
+            nonlocal transaction_active
+            transaction_active = True
+            try:
+                yield
+            finally:
+                transaction_active = False
+
+        conn = AsyncMock()
+
+        async def _execute(sql: str) -> None:
+            if "pg_advisory_xact_lock" in sql:
+                advisory_called_inside.append(transaction_active)
+            else:
+                schema_called_inside.append(transaction_active)
+
+        conn.execute = AsyncMock(side_effect=_execute)
+        conn.transaction = MagicMock(side_effect=_tracking_transaction)
+
+        pool = _make_pool_mock(conn)
+        plugin = _make_plugin_with_pool(pool)
+        config = _make_config()
+
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch(
+                "pathlib.Path.read_text",
+                return_value="CREATE TABLE IF NOT EXISTS t (id serial);",
+            ),
+        ):
+            await plugin._initialize_schema(config)  # type: ignore[attr-defined]
+
+        assert advisory_called_inside == [True], (
+            "pg_advisory_xact_lock must execute while conn.transaction() is "
+            "active so the lock auto-releases on commit/rollback. "
+            f"transaction_active at call time: {advisory_called_inside}"
+        )
+        assert schema_called_inside == [True], (
+            "Schema SQL must also execute inside the transaction block. "
+            f"transaction_active at call time: {schema_called_inside}"
+        )
+
+    @pytest.mark.unit
     async def test_advisory_lock_called_before_schema_sql(self) -> None:
         """pg_advisory_xact_lock execute precedes schema SQL execute (R1).
 
