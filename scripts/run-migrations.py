@@ -17,6 +17,7 @@ import argparse
 import asyncio
 import hashlib
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -62,6 +63,99 @@ def file_checksum(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def split_sql_statements(sql: str) -> list[str]:
+    """Split SQL text into individual statements, respecting dollar-quoting.
+
+    Needed for migrations that contain CREATE INDEX CONCURRENTLY, which cannot
+    run inside a multi-statement simple-query block (Postgres wraps those in an
+    implicit transaction).
+
+    Uses a token-scan approach:
+    - SQL single-line comments (--) are consumed without splitting.
+    - Dollar-quoted strings ($$ or $tag$) are consumed without splitting.
+    - Single-quoted strings are consumed without splitting.
+    - Semicolons outside of the above contexts terminate a statement.
+    """
+
+    statements: list[str] = []
+    buf: list[str] = []
+    pos = 0
+    n = len(sql)
+
+    while pos < n:
+        ch = sql[pos]
+
+        # Single-line comment: consume to end of line
+        if ch == "-" and pos + 1 < n and sql[pos + 1] == "-":
+            end = sql.find("\n", pos)
+            if end == -1:
+                end = n
+            else:
+                end += 1
+            buf.append(sql[pos:end])
+            pos = end
+            continue
+
+        # Dollar-quoted string: $tag$...$tag$
+        if ch == "$":
+            m = re.match(r"\$([^$]*)\$", sql[pos:])
+            if m:
+                tag = m.group(0)  # e.g. "$$" or "$BODY$"
+                close_pos = sql.find(tag, pos + len(tag))
+                if close_pos == -1:
+                    # Unclosed dollar-quote: consume rest of input
+                    buf.append(sql[pos:])
+                    pos = n
+                else:
+                    end = close_pos + len(tag)
+                    buf.append(sql[pos:end])
+                    pos = end
+                continue
+
+        # Single-quoted string: consume respecting '' escapes
+        if ch == "'":
+            end = pos + 1
+            while end < n:
+                if sql[end] == "'" and end + 1 < n and sql[end + 1] == "'":
+                    end += 2  # escaped quote
+                elif sql[end] == "'":
+                    end += 1
+                    break
+                else:
+                    end += 1
+            buf.append(sql[pos:end])
+            pos = end
+            continue
+
+        # Statement terminator
+        if ch == ";":
+            buf.append(";")
+            stmt = "".join(buf).strip()
+            if stmt and stmt != ";":
+                statements.append(stmt)
+            buf = []
+            pos += 1
+            continue
+
+        buf.append(ch)
+        pos += 1
+
+    # Trailing statement without semicolon
+    remainder = "".join(buf).strip()
+    if remainder:
+        statements.append(remainder)
+
+    # Filter out fragments that contain only comments (no SQL keywords or DDL).
+    def _has_sql_content(stmt: str) -> bool:
+        for line in stmt.splitlines():
+            stripped = line.strip()
+            if stripped and not stripped.startswith("--"):
+                return True
+        return False
+
+    return [s for s in statements if _has_sql_content(s)]
+
+
 async def ensure_schema_migrations_table(conn: asyncpg.Connection) -> None:
     """Create schema_migrations if it does not exist (idempotent)."""
     await conn.execute("""
@@ -97,7 +191,22 @@ async def apply_migration(
         print(f"  [dry-run] would apply: {mid}")
         return
 
-    await conn.execute(sql)
+    # Migrations that use CREATE INDEX CONCURRENTLY cannot run inside an implicit
+    # transaction block (which Postgres creates when you send multiple statements
+    # via the simple-query protocol). Execute each statement individually so that
+    # every statement runs in its own autocommit context.
+    #
+    # Check for CONCURRENTLY only in non-comment lines to avoid false positives
+    # on migration files that mention CONCURRENTLY only in comments.
+    non_comment_lines = [
+        line for line in sql.splitlines() if not line.strip().startswith("--")
+    ]
+    has_concurrent_index = "CONCURRENTLY" in "\n".join(non_comment_lines).upper()
+    if has_concurrent_index:
+        for stmt in split_sql_statements(sql):
+            await conn.execute(stmt)
+    else:
+        await conn.execute(sql)
     await conn.execute(
         """
         INSERT INTO public.schema_migrations (migration_id, checksum, source_set)
