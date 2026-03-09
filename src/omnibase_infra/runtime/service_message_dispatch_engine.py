@@ -840,10 +840,11 @@ class MessageDispatchEngine:
 
             # Validate all routes reference existing dispatchers
             for route in self._routes.values():
-                if route.dispatcher_id not in self._dispatchers:
+                rid = route.dispatcher_id
+                if rid not in self._dispatchers:
                     raise ModelOnexError(
                         message=f"Route '{route.route_id}' references dispatcher "
-                        f"'{route.dispatcher_id}' which is not registered. "
+                        f"'{rid}' which is not registered. "
                         "Register the dispatcher before freezing.",
                         error_code=EnumCoreErrorCode.ITEM_NOT_REGISTERED,
                     )
