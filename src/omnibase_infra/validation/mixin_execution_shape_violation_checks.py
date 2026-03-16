@@ -586,9 +586,9 @@ class MixinExecutionShapeViolationChecks:
         return violations
 
     # Abstract method declaration for type checking - implemented by MixinNodeArchetypeDetection
-    def _get_name_from_expr(
+    def _get_name_from_expr(  # stub-ok: abstract mixin
         self, expr: ast.expr
-    ) -> str | None:  # stub-ok — mixin delegation
+    ) -> str | None:
         """Extract a name string from an AST expression.
 
         Note:

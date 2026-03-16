@@ -111,7 +111,7 @@ class MixinProjectorSqlOperations:
     _query_timeout: float
 
     @property
-    def projector_id(self) -> str:  # stub-ok — mixin requires subclass impl
+    def projector_id(self) -> str:  # stub-ok: abstract mixin
         """Unique identifier for the projector (expected from implementing class)."""
         raise NotImplementedError("projector_id must be implemented by subclass")
 
