@@ -1036,6 +1036,7 @@ class PluginRegistration:
             from omnibase_infra.runtime.event_bus_subcontract_wiring import (
                 EventBusSubcontractWiring,
                 load_event_bus_subcontract,
+                load_published_events_map,
             )
             from omnibase_infra.runtime.service_dispatch_result_applier import (
                 DispatchResultApplier,
@@ -1052,6 +1053,27 @@ class PluginRegistration:
                 return ModelDomainPluginResult.skipped(
                     plugin_id=self.plugin_id,
                     reason=f"No event_bus subcontract in {contract_path}",
+                )
+
+            # Load per-event-type topic routing from contract published_events
+            # (OMN-5132).  Maps event_type names to their declared Kafka topics
+            # so DispatchResultApplier can route each output event to the correct
+            # topic instead of a single output_topic fallback.
+            published_events_map = load_published_events_map(
+                contract_path, logger=logger
+            )
+
+            logger.info(
+                "Loaded published_events_map from %s: %d event-type→topic mappings",
+                contract_path,
+                len(published_events_map),
+            )
+            if not published_events_map:
+                logger.warning(
+                    "published_events_map is EMPTY for %s — all output events will use fallback topic %r. "
+                    "This likely indicates a missing or malformed contract file.",
+                    contract_path,
+                    config.output_topic,
                 )
 
             # Create intent executor for effect layer delegation (Phase C)
@@ -1096,6 +1118,7 @@ class PluginRegistration:
                 output_topic=config.output_topic,
                 intent_executor=intent_executor,
                 topic_router=_TOPIC_ROUTER,
+                output_topic_map=published_events_map,
             )
 
             # Register DispatchResultApplier in the DI container for the same
