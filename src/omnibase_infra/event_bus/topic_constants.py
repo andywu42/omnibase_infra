@@ -563,6 +563,20 @@ Consumer: Omnidash /circuit-breakers dashboard
 Ticket: OMN-5293
 """
 
+# Wiring Health Snapshot topics (OMN-5292)
+TOPIC_WIRING_HEALTH_SNAPSHOT: Final[str] = (
+    "onex.evt.omnibase-infra.wiring-health-snapshot.v1"
+)
+"""Wiring health snapshot events emitted by WiringHealthChecker.
+
+Emitted periodically with per-topic emission/consumption counts and
+overall health status for display in the wiring health dashboard.
+
+Producer: WiringHealthChecker
+Consumer: Omnidash /wiring-health dashboard
+Ticket: OMN-5292
+"""
+
 # Grouped constants for wiring health monitoring
 WIRING_HEALTH_MONITORED_TOPICS: Final[tuple[str, ...]] = (
     TOPIC_SESSION_OUTCOME_CURRENT,
@@ -596,6 +610,8 @@ __all__ = [
     "TOPIC_LLM_CALL_COMPLETED_INFRA",
     # LLM Endpoint Health Topics
     "TOPIC_LLM_ENDPOINT_HEALTH",
+    # Wiring Health Snapshot Topics (OMN-5292)
+    "TOPIC_WIRING_HEALTH_SNAPSHOT",
     # Wiring Health Topics
     "TOPIC_INJECTION_AGENT_MATCH",
     "TOPIC_INJECTION_CONTEXT_UTILIZATION",

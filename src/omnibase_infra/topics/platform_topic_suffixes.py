@@ -419,6 +419,16 @@ Producer: omnibase_infra baselines compute node (TODO: implement — OMN-4296)
 Consumer: omnidash /baselines dashboard
 """
 
+SUFFIX_WIRING_HEALTH_SNAPSHOT: str = "onex.evt.omnibase-infra.wiring-health-snapshot.v1"
+"""Topic suffix for wiring health snapshot events.
+
+Published by WiringHealthChecker after each health evaluation cycle.
+Each event carries per-topic emission/consumption counts and overall health status.
+
+Producer: WiringHealthChecker (OMN-5292)
+Consumer: omnidash /wiring-health dashboard
+"""
+
 SUFFIX_CIRCUIT_BREAKER_STATE: str = "onex.evt.omnibase-infra.circuit-breaker.v1"
 """Topic suffix for circuit breaker state transition events.
 
@@ -469,6 +479,15 @@ ALL_OMNIBASE_INFRA_TOPIC_SPECS: tuple[ModelTopicSpec, ...] = (
     # Circuit breaker state transitions (3 partitions — low-throughput, state-change-driven)
     ModelTopicSpec(
         suffix=SUFFIX_CIRCUIT_BREAKER_STATE,
+        partitions=3,
+        kafka_config={
+            "retention.ms": "604800000",
+            "cleanup.policy": "delete",
+        },  # 7 days
+    ),
+    # Wiring health snapshots (3 partitions — low-throughput, per-evaluation-cycle)
+    ModelTopicSpec(
+        suffix=SUFFIX_WIRING_HEALTH_SNAPSHOT,
         partitions=3,
         kafka_config={
             "retention.ms": "604800000",
