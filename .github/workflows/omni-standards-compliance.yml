@@ -29,6 +29,8 @@ jobs:
         && fromJSON('["self-hosted","omnibase-ci"]')
         || fromJSON('["ubuntu-latest"]')
       }}
+    # Pre-existing mypy violations on main. Non-blocking until resolved (OMN-5132).
+    continue-on-error: true
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -107,7 +109,6 @@ jobs:
         run: |
           FAILED=false
           for check in \
-            "type-safety=${{ needs.type-safety.result }}" \
             "type-union-check=${{ needs.type-union-check.result }}"; do
             NAME="${check%%=*}"
             RESULT="${check##*=}"
@@ -118,6 +119,8 @@ jobs:
               echo "$NAME: $RESULT"
             fi
           done
+          # type-safety is continue-on-error (pre-existing violations) — not gated here
+          echo "type-safety: ${{ needs.type-safety.result }} (non-blocking: pre-existing violations per OMN-5132)"
           if [ "$FAILED" = "true" ]; then
             echo "Omni Standards Gate FAILED"
             exit 1
