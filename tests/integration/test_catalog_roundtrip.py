@@ -118,11 +118,11 @@ def test_catalog_generates_and_starts_core_bundle() -> None:
 
 @pytest.mark.integration
 @pytest.mark.slow
-def test_catalog_validator_rejects_missing_env(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+def test_catalog_validator_rejects_missing_env() -> None:
     """Validator must fail before starting if required vars are missing."""
-    monkeypatch.delenv("POSTGRES_PASSWORD", raising=False)
+    # Build env dict without POSTGRES_PASSWORD — must pass explicit env to
+    # subprocess since monkeypatch.delenv only affects the current process.
+    env = {k: v for k, v in os.environ.items() if k != "POSTGRES_PASSWORD"}
     result = subprocess.run(
         [
             "uv",
@@ -137,6 +137,7 @@ def test_catalog_validator_rejects_missing_env(
         text=True,
         cwd=REPO_ROOT,
         check=False,
+        env=env,
     )
     assert result.returncode != 0
     assert "POSTGRES_PASSWORD" in result.stderr
