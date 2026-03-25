@@ -152,6 +152,9 @@ dev = [
 
 [tool.uv.sources]
 onex-change-control = { git = "https://github.com/OmniNode-ai/onex_change_control.git", branch = "main" }
+# OMN-6440: Use omnibase_core branch with runtime contracts package-data fix.
+# TODO: Remove after omnibase_core releases with the contracts fix.
+omnibase-core = { git = "https://github.com/OmniNode-ai/omnibase_core.git", branch = "jonahgabriel/omn-6440-runtime-contract-yamls" }
 
 [tool.ruff]
 target-version = "py312"
