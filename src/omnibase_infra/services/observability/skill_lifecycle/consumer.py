@@ -55,7 +55,6 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse, urlunparse
-from uuid import uuid4
 
 import asyncpg
 from aiohttp import web
@@ -67,6 +66,10 @@ from omnibase_infra.services.observability.skill_lifecycle.config import (
 )
 from omnibase_infra.services.observability.skill_lifecycle.writer_postgres import (
     WriterSkillLifecyclePostgres,
+)
+from omnibase_infra.topics import (
+    SUFFIX_OMNICLAUDE_SKILL_COMPLETED,
+    SUFFIX_OMNICLAUDE_SKILL_STARTED,
 )
 
 if TYPE_CHECKING:
@@ -269,8 +272,8 @@ class ConsumerMetrics:
 # Skill Lifecycle Consumer
 # =============================================================================
 
-TOPIC_STARTED = "onex.evt.omniclaude.skill-started.v1"
-TOPIC_COMPLETED = "onex.evt.omniclaude.skill-completed.v1"
+TOPIC_STARTED = SUFFIX_OMNICLAUDE_SKILL_STARTED
+TOPIC_COMPLETED = SUFFIX_OMNICLAUDE_SKILL_COMPLETED
 
 
 class SkillLifecycleConsumer:
