@@ -65,10 +65,13 @@ LLM_ENDPOINT_HEALTH: Final[str] = "LLM_ENDPOINT_HEALTH"
 """LLM endpoint health probe events."""
 
 LLM_INFERENCE_REQUEST: Final[str] = "LLM_INFERENCE_REQUEST"
-"""Inbound LLM inference request commands."""
+"""Inbound LLM inference request command topic."""
 
 LLM_EMBEDDING_REQUEST: Final[str] = "LLM_EMBEDDING_REQUEST"
-"""Inbound LLM embedding request commands."""
+"""Inbound LLM embedding request command topic."""
+
+EVAL_COMPLETED: Final[str] = "EVAL_COMPLETED"
+"""Eval task completed event from ServiceEvalRunner."""
 
 # ==============================================================================
 # Effectiveness Topics
@@ -161,6 +164,7 @@ __all__: list[str] = [
     "CONSUMER_RESTART_CMD",
     "EFFECTIVENESS_INVALIDATION",
     "ERROR_TRIAGED",
+    "EVAL_COMPLETED",
     "HOOK_CONTEXT_INJECTED",
     "INJECTION_AGENT_MATCH",
     "INJECTION_CONTEXT_UTILIZATION",

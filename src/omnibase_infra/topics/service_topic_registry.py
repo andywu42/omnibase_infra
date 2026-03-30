@@ -91,6 +91,7 @@ class ServiceTopicRegistry:
             topic_keys.LLM_EMBEDDING_REQUEST: (
                 "onex.cmd.omnibase-infra.llm-embedding-request.v1"
             ),
+            topic_keys.EVAL_COMPLETED: ("onex.evt.omnibase-infra.eval-completed.v1"),
             # Effectiveness
             topic_keys.EFFECTIVENESS_INVALIDATION: (
                 "onex.evt.omnibase-infra.effectiveness-data-changed.v1"
