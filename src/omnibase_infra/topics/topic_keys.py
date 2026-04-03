@@ -164,6 +164,13 @@ ERROR_TRIAGED: Final[str] = "ERROR_TRIAGED"
 """Runtime error triage result events from NodeRuntimeErrorTriageEffect."""
 
 # ==============================================================================
+# Routing Topics
+# ==============================================================================
+
+ROUTING_DECIDED: Final[str] = "ROUTING_DECIDED"
+"""Routing decision event from AdapterModelRouter."""
+
+# ==============================================================================
 # Baselines Topics
 # ==============================================================================
 
@@ -264,6 +271,7 @@ __all__: list[str] = [
     "LLM_ENDPOINT_HEALTH",
     "LLM_INFERENCE_REQUEST",
     "RESOLUTION_DECIDED",
+    "ROUTING_DECIDED",
     "REWARD_ASSIGNED",
     "RUNTIME_ERROR",
     "SAVINGS_ESTIMATED",
