@@ -16,6 +16,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from omnibase_infra.nodes.node_build_dispatch_effect.models.model_build_dispatch_outcome import (
     ModelBuildDispatchOutcome,
 )
+from omnibase_infra.nodes.node_build_dispatch_effect.models.model_delegation_payload import (
+    ModelDelegationPayload,
+)
 
 
 class ModelBuildDispatchResult(BaseModel):
@@ -31,6 +34,10 @@ class ModelBuildDispatchResult(BaseModel):
         default=0, ge=0, description="Successfully dispatched count."
     )
     total_failed: int = Field(default=0, ge=0, description="Failed dispatch count.")
+    delegation_payloads: tuple[ModelDelegationPayload, ...] = Field(
+        default=(),
+        description="Delegation request payloads for the orchestrator to publish.",
+    )
 
 
 __all__: list[str] = ["ModelBuildDispatchResult"]
