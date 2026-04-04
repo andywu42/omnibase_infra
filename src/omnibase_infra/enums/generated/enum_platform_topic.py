@@ -18,6 +18,7 @@ class EnumPlatformTopic(str, Enum):
     All values are raw topic strings as declared in contract.yaml.
     Members are sorted by (kind, event_name, version).
     """
+    CMD_CONTRACT_RESOLVE_REQUESTED_V1 = "onex.cmd.platform.contract-resolve-requested.v1"  # onex.cmd.platform.contract-resolve-requested.v1
     CMD_INTENT_QUERY_DISTRIBUTION_V1 = "onex.cmd.platform.intent-query-distribution.v1"  # onex.cmd.platform.intent-query-distribution.v1
     CMD_INTENT_QUERY_SESSION_V1 = "onex.cmd.platform.intent-query-session.v1"  # onex.cmd.platform.intent-query-session.v1
     CMD_LEDGER_APPEND_V1 = "onex.cmd.platform.ledger-append.v1"  # onex.cmd.platform.ledger-append.v1
