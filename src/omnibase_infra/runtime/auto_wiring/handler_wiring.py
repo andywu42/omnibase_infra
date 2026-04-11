@@ -26,6 +26,9 @@ from collections import defaultdict
 from collections.abc import Awaitable, Callable
 from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
+from omnibase_core.protocols.event_bus.protocol_event_bus_subscriber import (
+    ProtocolEventBusSubscriber,
+)
 from omnibase_infra.runtime.auto_wiring.models import (
     ModelAutoWiringManifest,
     ModelDiscoveredContract,
@@ -40,9 +43,6 @@ from omnibase_infra.runtime.auto_wiring.report import (
 
 if TYPE_CHECKING:
     from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
-    from omnibase_core.protocols.event_bus.protocol_event_bus_subscriber import (
-        ProtocolEventBusSubscriber,
-    )
     from omnibase_infra.models.dispatch.model_dispatch_result import (
         ModelDispatchResult,
     )
@@ -366,14 +366,14 @@ async def _wire_single_contract(
                     env=environment,
                     service=contract.package_name,
                     node_name=contract.name,
-                    version="v1",
+                    version=str(contract.contract_version),
                 )
                 consumer_group = compute_consumer_group_id(
                     node_identity, EnumConsumerGroupPurpose.CONSUME
                 )
                 callback = _make_event_bus_callback(topic, dispatch_engine)
                 typed_bus = cast("ProtocolEventBusSubscriber", event_bus)
-                unsubscribe = await typed_bus.subscribe(
+                _unsubscribe = await typed_bus.subscribe(
                     topic=topic,
                     node_identity=node_identity,
                     on_message=callback,
