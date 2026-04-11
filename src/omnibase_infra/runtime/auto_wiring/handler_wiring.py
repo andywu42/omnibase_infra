@@ -104,6 +104,33 @@ def _make_dispatch_callback(
     return _callback
 
 
+def _make_event_bus_callback(
+    topic: str,
+    dispatch_engine: object,
+) -> Callable[..., Awaitable[None]]:
+    """Create a Kafka on_message callback that deserializes and dispatches to engine.
+
+    Mirrors EventBusSubcontractWiring._create_dispatch_callback but stripped of
+    DLQ/idempotency concerns — auto-wired nodes rely on the simplified path.
+    """
+    import json
+
+    from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
+
+    async def callback(message: object) -> None:
+        raw = getattr(message, "value", None)
+        if raw is not None:
+            data = json.loads(raw.decode("utf-8") if isinstance(raw, bytes) else raw)
+            envelope: ModelEventEnvelope[object] = ModelEventEnvelope[
+                object
+            ].model_validate(data)
+        else:
+            envelope = message  # type: ignore[assignment]
+        await dispatch_engine.dispatch(topic, envelope)  # type: ignore[union-attr]
+
+    return callback
+
+
 def _derive_route_id(contract_name: str, handler_name: str) -> str:
     """Derive a route ID from contract and handler names."""
     return f"route.auto.{contract_name}.{handler_name}"
@@ -309,14 +336,34 @@ async def _wire_single_contract(
 
         # Subscribe to Kafka topics via event bus
         if event_bus is not None and contract.event_bus:
+            from omnibase_infra.enums import EnumConsumerGroupPurpose
+            from omnibase_infra.models import ModelNodeIdentity
+            from omnibase_infra.utils import compute_consumer_group_id
+
             for topic in contract.event_bus.subscribe_topics:
+                node_identity = ModelNodeIdentity(
+                    env=environment,
+                    service=contract.package_name,
+                    node_name=contract.name,
+                    version="v1",
+                )
+                consumer_group = compute_consumer_group_id(
+                    node_identity, EnumConsumerGroupPurpose.CONSUME
+                )
+                callback = _make_event_bus_callback(topic, dispatch_engine)
+                unsubscribe = await event_bus.subscribe(
+                    topic=topic,
+                    node_identity=node_identity,
+                    on_message=callback,
+                )
                 topics_subscribed.append(topic)
 
-            logger.info(
-                "Auto-wired topics for %s: %s",
-                contract.name,
-                contract.event_bus.subscribe_topics,
-            )
+                logger.info(
+                    "Auto-wired subscription: topic=%s consumer_group=%s node=%s",
+                    topic,
+                    consumer_group,
+                    contract.name,
+                )
 
     except Exception as exc:  # noqa: BLE001 — boundary: structured diagnostics for auto-wiring
         logger.error(
