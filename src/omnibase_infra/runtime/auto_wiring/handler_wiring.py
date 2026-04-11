@@ -24,8 +24,11 @@ import inspect
 import logging
 from collections import defaultdict
 from collections.abc import Awaitable, Callable
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
 
+from omnibase_core.protocols.event_bus.protocol_event_bus_subscriber import (
+    ProtocolEventBusSubscriber,
+)
 from omnibase_infra.runtime.auto_wiring.models import (
     ModelAutoWiringManifest,
     ModelDiscoveredContract,
@@ -102,6 +105,51 @@ def _make_dispatch_callback(
         return await handle_method(envelope)
 
     return _callback
+
+
+def _make_event_bus_callback(
+    topic: str,
+    dispatch_engine: ProtocolDispatchEngine,
+) -> Callable[..., Awaitable[None]]:
+    """Create a Kafka on_message callback that deserializes and dispatches to engine.
+
+    Mirrors EventBusSubcontractWiring._create_dispatch_callback but stripped of
+    DLQ/idempotency concerns — auto-wired nodes rely on the simplified path.
+    """
+    import json
+
+    from omnibase_core.models.events.model_event_envelope import ModelEventEnvelope
+
+    async def callback(message: object) -> None:
+        try:
+            raw = getattr(message, "value", None)
+            if raw is not None:
+                data = json.loads(
+                    raw.decode("utf-8") if isinstance(raw, bytes) else raw
+                )
+                envelope: ModelEventEnvelope[object] = ModelEventEnvelope[
+                    object
+                ].model_validate(data)
+            else:
+                if not isinstance(message, ModelEventEnvelope):
+                    logger.warning(
+                        "Auto-wiring callback: message has no 'value' and is not a ModelEventEnvelope"
+                        " — dropping. topic=%s message_type=%s",
+                        topic,
+                        type(message).__name__,
+                    )
+                    return
+                envelope = message
+            await dispatch_engine.dispatch(topic, envelope)
+        except Exception as exc:  # noqa: BLE001 — boundary: log and discard; unsubscribe unavailable here
+            logger.error(
+                "Auto-wiring callback error: topic=%s error_type=%s error=%s",
+                topic,
+                type(exc).__name__,
+                exc,
+            )
+
+    return callback
 
 
 def _derive_route_id(contract_name: str, handler_name: str) -> str:
@@ -294,6 +342,7 @@ async def _wire_single_contract(
     dispatchers_registered: list[str] = []
     routes_registered: list[str] = []
     topics_subscribed: list[str] = []
+    unsubscribers: list[Callable[[], Awaitable[None]]] = []
 
     try:
         # Import and wire each handler from handler_routing
@@ -309,14 +358,38 @@ async def _wire_single_contract(
 
         # Subscribe to Kafka topics via event bus
         if event_bus is not None and contract.event_bus:
+            from omnibase_infra.enums import EnumConsumerGroupPurpose
+            from omnibase_infra.models import ModelNodeIdentity
+            from omnibase_infra.utils import compute_consumer_group_id
+
             for topic in contract.event_bus.subscribe_topics:
+                node_identity = ModelNodeIdentity(
+                    env=environment,
+                    service=contract.package_name,
+                    node_name=contract.name,
+                    version=str(contract.contract_version),
+                )
+                consumer_group = compute_consumer_group_id(
+                    node_identity, EnumConsumerGroupPurpose.CONSUME
+                )
+                callback = _make_event_bus_callback(topic, dispatch_engine)
+                typed_bus: ProtocolEventBusSubscriber = cast(
+                    "ProtocolEventBusSubscriber", event_bus
+                )
+                unsubscribe = await typed_bus.subscribe(
+                    topic=topic,
+                    node_identity=node_identity,
+                    on_message=callback,
+                )
+                unsubscribers.append(unsubscribe)
                 topics_subscribed.append(topic)
 
-            logger.info(
-                "Auto-wired topics for %s: %s",
-                contract.name,
-                contract.event_bus.subscribe_topics,
-            )
+                logger.info(
+                    "Auto-wired subscription: topic=%s consumer_group=%s node=%s",
+                    topic,
+                    consumer_group,
+                    contract.name,
+                )
 
     except Exception as exc:  # noqa: BLE001 — boundary: structured diagnostics for auto-wiring
         logger.error(
