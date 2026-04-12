@@ -34,12 +34,13 @@ PUBLISH_RETRY_INTERVAL = 30
 
 
 class DeployAgent:
-    def __init__(self):
+    def __init__(self, *, skip_self_update: bool = False):
         self.job_store = JobStore(state_dir=STATE_DIR)
         self.executor = DeployExecutor()
         self._state = "idle"
         self._shutdown = False
         self._current_git_sha = ""
+        self._skip_self_update = skip_self_update
 
     def _get_state(self) -> str:
         return self._state
@@ -143,6 +144,7 @@ class DeployAgent:
                 cmd.services,
                 on_phase_update=on_phase_update,
                 git_sha=self._current_git_sha,
+                skip_self_update=self._skip_self_update,
             )
 
             # Verify
