@@ -10,6 +10,7 @@ registration orchestrator workflow.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -18,11 +19,11 @@ import click
 from rich.console import Console
 
 from omnibase_infra.cli.infra_test._helpers import get_broker
+from omnibase_infra.enums.generated.enum_platform_topic import EnumPlatformTopic
 
 console = Console()
 
-# Default ONEX topic for introspection events (5-segment format)
-DEFAULT_INTROSPECTION_TOPIC = "onex.evt.platform.node-introspection.v1"
+DEFAULT_INTROSPECTION_TOPIC = EnumPlatformTopic.EVT_NODE_INTROSPECTION_V1.value
 
 
 def _build_introspection_payload(
@@ -80,7 +81,9 @@ def _build_introspection_payload(
         "declared_capabilities": {},
         "discovered_capabilities": {},
         "contract_capabilities": None,
-        "endpoints": {"health": f"http://localhost:8080/{nid}/health"},
+        "endpoints": {
+            "health": f"{os.environ.get('ONEX_RUNTIME_URL', 'http://localhost:8080')}/{nid}/health"
+        },
         "reason": "STARTUP",
         "correlation_id": cid,
         "timestamp": now,
