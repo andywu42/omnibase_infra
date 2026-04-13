@@ -10,6 +10,7 @@ registration orchestrator workflow.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -80,7 +81,9 @@ def _build_introspection_payload(
         "declared_capabilities": {},
         "discovered_capabilities": {},
         "contract_capabilities": None,
-        "endpoints": {"health": f"http://localhost:8080/{nid}/health"},
+        "endpoints": {
+            "health": f"{os.environ.get('ONEX_RUNTIME_URL', 'http://localhost:8080')}/{nid}/health"
+        },
         "reason": "STARTUP",
         "correlation_id": cid,
         "timestamp": now,

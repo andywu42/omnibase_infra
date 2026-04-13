@@ -48,8 +48,8 @@ Example Usage:
     from omnibase_infra.projectors import SnapshotPublisherRegistration
     from omnibase_infra.models.projection import ModelSnapshotTopicConfig
 
-    # Create producer and config
-    producer = AIOKafkaProducer(bootstrap_servers="localhost:19092")
+    # Create producer and config (use KAFKA_BOOTSTRAP_SERVERS in production)
+    producer = AIOKafkaProducer(bootstrap_servers="localhost:19092")  # local-path-ok
     config = ModelSnapshotTopicConfig.default()
 
     # Initialize publisher
