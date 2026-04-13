@@ -19,11 +19,11 @@ import click
 from rich.console import Console
 
 from omnibase_infra.cli.infra_test._helpers import get_broker
+from omnibase_infra.enums.generated.enum_platform_topic import EnumPlatformTopic
 
 console = Console()
 
-# Default ONEX topic for introspection events (5-segment format)
-DEFAULT_INTROSPECTION_TOPIC = "onex.evt.platform.node-introspection.v1"
+DEFAULT_INTROSPECTION_TOPIC = EnumPlatformTopic.EVT_NODE_INTROSPECTION_V1.value
 
 
 def _build_introspection_payload(
