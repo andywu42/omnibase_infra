@@ -31,12 +31,11 @@ The S608 suppression for this file is configured in pyproject.toml under
 
 from __future__ import annotations
 
-import asyncio
 import uuid
-from collections.abc import Iterator
 from typing import TYPE_CHECKING
 
 import pytest
+import pytest_asyncio
 
 from omnibase_infra.errors.repository import (
     RepositoryContractError,
@@ -59,22 +58,8 @@ if TYPE_CHECKING:
 pytestmark = [
     pytest.mark.postgres,
     pytest.mark.integration,
-    pytest.mark.asyncio,
+    pytest.mark.asyncio(loop_scope="module"),
 ]
-
-
-@pytest.fixture(scope="module")
-def event_loop() -> Iterator[asyncio.AbstractEventLoop]:
-    """Create module-scoped event loop for async fixtures.
-
-    Required because db_pool and cleanup_test_table fixtures are module-scoped,
-    but pytest-asyncio's default event_loop fixture is function-scoped.
-    This prevents ScopeMismatch errors when module-scoped async fixtures
-    try to use the event loop.
-    """
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
 
 
 def _check_postgres_configured() -> tuple[bool, str]:
@@ -126,7 +111,7 @@ _TEST_TABLE_NAME = f"test_runtime_{uuid.uuid4().hex[:8]}"
 _TABLE_CREATED = False
 
 
-@pytest.fixture(scope="module")
+@pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def db_pool():
     """Create a connection pool for the test module.
 
@@ -144,7 +129,7 @@ async def db_pool():
     await pool.close()
 
 
-@pytest.fixture(scope="module", autouse=True)
+@pytest_asyncio.fixture(scope="module", loop_scope="module", autouse=True)
 async def cleanup_test_table(db_pool):
     """Clean up test table after all tests complete."""
     yield
@@ -152,7 +137,7 @@ async def cleanup_test_table(db_pool):
         await conn.execute(f"DROP TABLE IF EXISTS {_TEST_TABLE_NAME}")
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def test_table(db_pool: asyncpg.Pool):
     """Create a temporary test table for isolation (reuses same table across tests)."""
     global _TABLE_CREATED  # noqa: PLW0603  # Module-scoped fixture state
