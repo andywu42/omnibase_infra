@@ -2737,6 +2737,7 @@ class MixinNodeIntrospection:
         enable_heartbeat: bool = True,
         heartbeat_interval_seconds: float = 30.0,
         enable_registry_listener: bool = True,
+        enable_ack_listener: bool = True,
     ) -> None:
         """Start background introspection tasks.
 
@@ -2747,6 +2748,9 @@ class MixinNodeIntrospection:
             enable_heartbeat: Whether to start the heartbeat loop
             heartbeat_interval_seconds: Interval between heartbeats in seconds
             enable_registry_listener: Whether to start the registry listener
+            enable_ack_listener: Whether to start the ACK listener for
+                registration-accepted events. Set False when only heartbeat
+                tasks should be started (e.g. from start_heartbeat_task()).
 
         Raises:
             ProtocolConfigurationError: If initialize_introspection() was not called.
@@ -2794,7 +2798,8 @@ class MixinNodeIntrospection:
 
         # Start ACK listener for registration-accepted events (if event bus available)
         if (
-            self._ack_listener_task is None
+            enable_ack_listener
+            and self._ack_listener_task is None
             and self._introspection_event_bus is not None
         ):
             self._ack_listener_task = asyncio.create_task(
@@ -2879,7 +2884,7 @@ class MixinNodeIntrospection:
             try:
                 await self._heartbeat_task
             except asyncio.CancelledError:
-                pass
+                pass  # Expected: awaiting a cancelled task raises CancelledError
             self._heartbeat_task = None
 
         # Cancel and wait for registry listener task
@@ -2888,7 +2893,7 @@ class MixinNodeIntrospection:
             try:
                 await self._registry_listener_task
             except asyncio.CancelledError:
-                pass
+                pass  # Expected: awaiting a cancelled task raises CancelledError
             self._registry_listener_task = None
 
         # Cancel and wait for ACK listener task
@@ -2897,13 +2902,49 @@ class MixinNodeIntrospection:
             try:
                 await self._ack_listener_task
             except asyncio.CancelledError:
-                pass
+                pass  # Expected: awaiting a cancelled task raises CancelledError
             self._ack_listener_task = None
 
         logger.info(
             f"Introspection tasks stopped for {self._introspection_node_id}",
             extra={"node_id": self._introspection_node_id},
         )
+
+    async def start_heartbeat_task(self) -> None:
+        """Start the periodic heartbeat publishing task (ProtocolNodeIntrospection).
+
+        Satisfies ProtocolNodeIntrospection.start_heartbeat_task(). Delegates to
+        start_introspection_tasks(enable_heartbeat=True, enable_registry_listener=False)
+        so RuntimeHostProcess can call the protocol method without knowing about
+        the broader start_introspection_tasks API.
+
+        Idempotent — safe to call multiple times; will not create duplicate tasks.
+
+        OMN-8691: Missing method caused RuntimeHostProcess to silently fail the
+        protocol call and left the introspection topic stale after every restart.
+        """
+        await self.start_introspection_tasks(
+            enable_heartbeat=True,
+            enable_registry_listener=False,
+            enable_ack_listener=False,
+        )
+
+    async def stop_heartbeat_task(self) -> None:
+        """Stop the periodic heartbeat publishing task (ProtocolNodeIntrospection).
+
+        Satisfies ProtocolNodeIntrospection.stop_heartbeat_task(). Cancels only
+        the heartbeat task, leaving any registry listener and ACK listener running.
+        Safe to call even if the task was never started.
+
+        OMN-8691: Symmetric teardown companion to start_heartbeat_task().
+        """
+        if self._heartbeat_task is not None:
+            self._heartbeat_task.cancel()
+            try:
+                await self._heartbeat_task
+            except asyncio.CancelledError:
+                pass  # Expected: awaiting a cancelled task raises CancelledError
+            self._heartbeat_task = None
 
     def invalidate_introspection_cache(self) -> None:
         """Invalidate the introspection cache.
