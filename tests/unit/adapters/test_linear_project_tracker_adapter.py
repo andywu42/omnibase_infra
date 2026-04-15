@@ -29,7 +29,7 @@ _FAKE_ISSUE = {
     "state": {"name": "In Progress", "type": "started"},
     "priority": {"name": "High"},
     "assignee": {"id": "u-1", "name": "Jonah"},
-    "labels": ["bug", "urgent"],
+    "labels": [{"id": "l-1", "name": "bug"}, {"id": "l-2", "name": "urgent"}],
     "team": {"id": "t-1", "name": "Omninode"},
     "url": "https://linear.app/test",
     "createdAt": "2026-01-01T00:00:00Z",
@@ -37,6 +37,7 @@ _FAKE_ISSUE = {
 }
 
 
+@pytest.mark.unit
 class TestLinearProjectTrackerAdapterLifecycle:
     def test_connect_returns_true(self) -> None:
         adapter = LinearProjectTrackerAdapter()
@@ -70,6 +71,7 @@ class TestLinearProjectTrackerAdapterLifecycle:
         asyncio.run(_run())
 
 
+@pytest.mark.unit
 class TestLinearProjectTrackerAdapterIssues:
     def test_get_issue_delegates_to_mcp(self) -> None:
         fake = MagicMock(return_value=_FAKE_ISSUE)
@@ -196,6 +198,7 @@ class TestLinearProjectTrackerAdapterIssues:
         asyncio.run(_run())
 
 
+@pytest.mark.unit
 class TestLinearProjectTrackerAdapterComments:
     def test_add_comment_delegates(self) -> None:
         fake = MagicMock(
@@ -228,6 +231,7 @@ class TestLinearProjectTrackerAdapterComments:
         asyncio.run(_run())
 
 
+@pytest.mark.unit
 class TestLinearProjectTrackerAdapterProjects:
     def test_get_project_delegates(self) -> None:
         fake = MagicMock(

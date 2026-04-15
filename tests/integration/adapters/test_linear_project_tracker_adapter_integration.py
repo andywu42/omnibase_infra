@@ -88,6 +88,7 @@ class _FakeLinearMcp:
         }
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_full_issue_lifecycle() -> None:
     mcp = _FakeLinearMcp()
@@ -129,6 +130,7 @@ async def test_full_issue_lifecycle() -> None:
     await adapter.close()
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_get_issue_missing_raises_key_error() -> None:
     mcp = _FakeLinearMcp()
@@ -139,6 +141,7 @@ async def test_get_issue_missing_raises_key_error() -> None:
         await adapter.get_issue("OMN-DOES-NOT-EXIST")
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_add_comment_on_missing_issue_raises_key_error() -> None:
     mcp = _FakeLinearMcp()

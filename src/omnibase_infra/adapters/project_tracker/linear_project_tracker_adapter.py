@@ -75,10 +75,15 @@ def _issue_from_mcp(d: dict[str, object]) -> ModelStubIssue:
         assignee = str(assignee_raw)
 
     labels_raw = d.get("labels", [])
+    labels: list[str] = []
     if isinstance(labels_raw, list):
-        labels = [str(x) for x in labels_raw]
-    else:
-        labels = []
+        for item in labels_raw:
+            if isinstance(item, dict):
+                label_name = item.get("name") or item.get("id")
+                if label_name is not None:
+                    labels.append(str(label_name))
+            elif item is not None:
+                labels.append(str(item))
 
     team_raw = d.get("team")
     if isinstance(team_raw, dict):
