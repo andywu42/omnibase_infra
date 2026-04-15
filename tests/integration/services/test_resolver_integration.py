@@ -22,6 +22,8 @@ from omnibase_infra.adapters.project_tracker.local_stub_project_tracker import (
 )
 from omnibase_infra.services.project_tracker.resolver import resolve_project_tracker
 
+pytestmark = pytest.mark.integration
+
 
 class TestResolveProjectTrackerIntegration:
     def test_no_token_resolves_to_working_local_stub(self, tmp_path: Path) -> None:

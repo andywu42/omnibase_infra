@@ -52,10 +52,12 @@ def resolve_project_tracker(
 
             return LinearProjectTrackerAdapter()
         except Exception as exc:  # noqa: BLE001 — fail-soft is the contract
+            # Log only the exception class name; never interpolate `exc` body to
+            # avoid leaking upstream secrets (tokens, connection strings, PII).
             log.warning(
                 "resolve_project_tracker: Linear adapter construction failed (%s); "
                 "falling back to LocalStubProjectTracker",
-                exc,
+                type(exc).__name__,
             )
 
     if _force_construction_error:
