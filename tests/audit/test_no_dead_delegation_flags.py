@@ -1,10 +1,13 @@
 # SPDX-FileCopyrightText: 2025 OmniNode.ai Inc.
 # SPDX-License-Identifier: MIT
-"""Regression test: dead delegation feature flags must not reappear in live config.
+"""Regression test: dead feature flags must not reappear in live config.
 
 OMN-8779: ENABLE_DELEGATION_BRIDGE and ENABLE_LOCAL_DELEGATION were no-ops after
-OMN-8746 made the Kafka delegation bridge unconditional. These flags were removed
-to prevent documentation lies from misleading future contributors.
+OMN-8746 made the Kafka delegation bridge unconditional.
+
+OMN-8780: ENABLE_LOCAL_INFERENCE_PIPELINE and ENABLE_PATTERN_ENFORCEMENT violated
+the no-informational-gates policy (defaulted to false = silent non-enforcement).
+Removed to make both pipeline and pattern enforcement unconditional.
 """
 
 from __future__ import annotations
@@ -16,7 +19,12 @@ import pytest
 
 pytestmark = [pytest.mark.unit]
 
-_DEAD_FLAGS = ("ENABLE_DELEGATION_BRIDGE", "ENABLE_LOCAL_DELEGATION")
+_DEAD_FLAGS = (
+    "ENABLE_DELEGATION_BRIDGE",
+    "ENABLE_LOCAL_DELEGATION",
+    "ENABLE_LOCAL_INFERENCE_PIPELINE",
+    "ENABLE_PATTERN_ENFORCEMENT",
+)
 
 _LIVE_CONFIG_GLOBS = (
     "**/*.env",
@@ -88,6 +96,6 @@ def test_no_dead_delegation_flags_in_live_config() -> None:
                 )
 
     assert not violations, (
-        "Dead delegation flags found in live config (OMN-8779):\n"
+        "Dead feature flags found in live config (OMN-8779, OMN-8780):\n"
         + "\n".join(violations)
     )
