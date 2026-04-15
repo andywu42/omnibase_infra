@@ -61,6 +61,14 @@ def _is_historical(path: Path) -> bool:
 
 _SELF = Path(__file__)
 
+# Guard tests that intentionally name the dead flags to assert their removal.
+_GUARD_TEST_SUFFIXES = ("tests/integration/test_dead_flag_removal_omn_8780.py",)
+
+
+def _is_guard_test(path: Path) -> bool:
+    path_str = path.as_posix()
+    return any(path_str.endswith(s) for s in _GUARD_TEST_SUFFIXES)
+
 
 def _collect_live_files(root: Path) -> list[Path]:
     found: list[Path] = []
@@ -73,6 +81,8 @@ def _collect_live_files(root: Path) -> list[Path]:
             if any(ex in p.parts for ex in _EXCLUDED_DIRS):
                 continue
             if _is_historical(p):
+                continue
+            if _is_guard_test(p):
                 continue
             found.append(p)
     return found
