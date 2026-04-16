@@ -93,7 +93,7 @@ class HandlerRuntimeErrorTriage:
 
     def __init__(
         self,
-        db_pool: Pool,
+        db_pool: Pool | None = None,
         *,
         rules: list[ModelTriageRule] | None = None,
         slack_handler: Callable[[str], Awaitable[None]] | None = None,
@@ -103,7 +103,8 @@ class HandlerRuntimeErrorTriage:
         """Initialize the triage handler.
 
         Args:
-            db_pool: asyncpg connection pool.
+            db_pool: asyncpg connection pool. When None (auto-wired path),
+                handle() returns a suppressed result with a warning log.
             rules: Triage rules in priority order. Defaults to DEFAULT_TRIAGE_RULES.
             slack_handler: Async callable accepting a message string.
             linear_handler: Async callable accepting title and description kwargs.
@@ -140,6 +141,18 @@ class HandlerRuntimeErrorTriage:
         Returns:
             ModelRuntimeErrorTriageResult with action taken and metadata.
         """
+        if self._db_pool is None:
+            logger.warning(
+                "HandlerRuntimeErrorTriage: db_pool not configured, suppressing event"
+            )
+            return ModelRuntimeErrorTriageResult(
+                fingerprint=event.fingerprint,
+                action="suppress",
+                matched_rule="no-pool-fallback",
+                incident_state="suppressed",
+                occurrence_count=0,
+            )
+
         # Find matching rule
         matched_rule = self._find_matching_rule(event)
         if matched_rule is None:
@@ -304,6 +317,7 @@ class HandlerRuntimeErrorTriage:
 
         Returns the correlated fingerprint or None.
         """
+        assert self._db_pool is not None  # guarded by handle() None-check
         try:
             async with self._db_pool.acquire() as conn:
                 row = await conn.fetchrow(
@@ -328,6 +342,7 @@ class HandlerRuntimeErrorTriage:
         correlated_fingerprint: str | None,
     ) -> dict[str, object]:
         """Upsert incident row in runtime_error_triage table."""
+        assert self._db_pool is not None  # guarded by handle() None-check
         async with self._db_pool.acquire() as conn:
             row = await conn.fetchrow(
                 """
@@ -390,6 +405,7 @@ class HandlerRuntimeErrorTriage:
 
     async def _update_incident_state(self, fingerprint: str, state: str) -> None:
         """Update the incident state for a fingerprint."""
+        assert self._db_pool is not None  # guarded by handle() None-check
         async with self._db_pool.acquire() as conn:
             await conn.execute(
                 """
